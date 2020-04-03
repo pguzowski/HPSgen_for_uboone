@@ -127,8 +127,8 @@ private:
 
   TTree *fSubRunTree;
   double fSubRunTree_totpot;
-  long   fSubRunTree_n_kaons_read;
-  long   fSubRunTree_n_scalars_gen;
+  ULong64_t fSubRunTree_n_kaons_read;
+  ULong64_t fSubRunTree_n_scalars_gen;
   int    fSubRunTree_n_scalar_decays_in_detector;
 
 };
