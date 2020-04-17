@@ -16,9 +16,11 @@ namespace hpsgen {
     explicit Geo(art::ServiceHandle<geo::Geometry const>& g);
     const TVector3& centre() const { return det_centre; }
     const TVector3& half_dims() const { return det_half_dims; }
+    const double max_path_length() const { return max_path_len; }
     private:
     TVector3 det_centre;
     TVector3 det_half_dims;
+    double max_path_len;
   };
   struct PhysicalConstants {
     explicit PhysicalConstants(fhicl::ParameterSet const& p);
@@ -55,6 +57,8 @@ namespace hpsgen {
       ~GenKinematics();
       bool generate(const TLorentzVector& kaon_decay_pos, const TLorentzVector& kaon_4mom, const double scalar_mass,
           const double model_theta, const int pion_type, const double flux_weight, const double max_weight, rng& rand, std::multimap<int,TLorentzVector>& result) const;
+      bool generate_uniform(const TLorentzVector& kaon_decay_pos, const TLorentzVector& kaon_4mom, const double scalar_mass,
+          const double model_theta, const int pion_type, rng& rand, std::multimap<int,TLorentzVector>& result) const;
       const PhysicalConstants& get_constants() const { return consts; }
       void update_geometry(art::ServiceHandle<geo::Geometry const>& g);
     private:
@@ -66,6 +70,9 @@ namespace hpsgen {
 
       TLorentzVector gen_random_scalar_decay_pos(const TLorentzVector& scalar4mom, const TLorentzVector& kaonpos,
           const double model_tau, rng& rand, const double* lambdas, double& weight) const;
+      
+      TLorentzVector gen_random_scalar_decay_pos_uniform(const TLorentzVector& scalar4mom, const TLorentzVector& kaonpos,
+          rng& rand, const double* lambdas, double& weight) const;
 
       bool pos_inside_detector(const TLorentzVector& scalar_dk_pos) const;
 

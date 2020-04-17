@@ -282,7 +282,10 @@ void hpsgen::HiggsPortalScalarGenFromBNBFlux::produce(art::Event& e)
     }
     std::multimap<int,TLorentzVector> res;
     fSubRunTree_n_scalars_gen++;
-    if(fKinHelper->generate(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, flux_weight, fMaxWeight, fRNG, res)) {
+    const bool passes = (fScalarParams == "random") ?
+      fKinHelper->generate_uniform(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, fRNG, res) :
+      fKinHelper->generate(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, flux_weight, fMaxWeight, fRNG, res);
+    if(passes) {
       
       const TLorentzVector& dk_pos = res.find(0)->second;
       const TLorentzVector& scalar_mom = res.find(54)->second;

@@ -58,6 +58,7 @@ hpsgen::Geo::Geo(art::ServiceHandle<geo::Geometry const>& g) {
   }
   det_centre.SetXYZ(0.5*(minx+maxx),0.5*(miny+maxy),0.5*(minz+maxz));
   det_half_dims.SetXYZ(0.5*(maxx-minx),0.5*(maxy-miny),0.5*(maxz-minz));
+  max_path_len = 2.*det_half_dims.Mag();
   //std::cout << "Constructed detector geometry. Centre: "; det_centre.Print();
   //std::cout << " half-widths: "; det_half_dims.Print();
 }
@@ -91,7 +92,8 @@ bool hpsgen::GenKinematics::generate(const TLorentzVector& kaon_decay_pos, const
 
   if(max_weight > 0.) {
     if(weight > max_weight) {
-      throw art::Exception(art::errors::LogicError) << "weight "<<weight<<" > max_weight "<<max_weight<<std::endl;
+      throw art::Exception(art::errors::LogicError) << "weight "<<weight<<" > max_weight "<<max_weight<<std::endl
+        <<" Modify max_weight (suggested "<<1.1*weight<<") and re-run."<<std::endl;
     }
     if(CLHEP::RandFlat::shoot(&rand, max_weight) > weight) return false;
   }
@@ -103,6 +105,33 @@ bool hpsgen::GenKinematics::generate(const TLorentzVector& kaon_decay_pos, const
   if(max_weight < 0.) {
     result.emplace(99,TLorentzVector{dk_weight,br_weight,flux_weight,weight});
   }
+
+  return true;
+}
+
+
+bool hpsgen::GenKinematics::generate_uniform(const TLorentzVector& kaon_decay_pos, const TLorentzVector& kaon_4mom, const double scalar_mass,
+          const double model_theta, const int pion_type, rng& rand, std::multimap<int,TLorentzVector>& result) const {
+  const double max_weight = geo->max_path_length();
+  const double pimass = (pion_type == 0 ? consts.mass_pion_0() : consts.mass_pion_pm());
+  TLorentzVector scalar4mom = gen_random_scalar_mom(scalar_mass, kaon_4mom.M(), pimass, kaon_4mom, rand);
+  double lambdas[2];
+  if(!intersects_ray(kaon_decay_pos.Vect(), scalar4mom.Vect(), lambdas)) return false;
+  double dk_weight = 0.;
+  TLorentzVector scalar_dk_pos = gen_random_scalar_decay_pos_uniform(scalar4mom, kaon_decay_pos, rand, lambdas, dk_weight);
+  if(!pos_inside_detector(scalar_dk_pos)) return false;
+  
+  const double weight = dk_weight; // in this case, dk_weight is just the path length
+
+  if(weight > max_weight) {
+    throw art::Exception(art::errors::LogicError) << "weight "<<weight<<" > max_weight "<<max_weight<<std::endl
+      <<" Modify max_weight (suggested "<<1.1*weight<<") and re-run."<<std::endl;
+  }
+  if(CLHEP::RandFlat::shoot(&rand, max_weight) > weight) return false;
+
+  result = gen_daughters(scalar4mom, model_theta, rand);
+  result.emplace(0,scalar_dk_pos);
+  result.emplace(pdg::k_scalar, scalar4mom);
 
   return true;
 }
@@ -143,6 +172,20 @@ TLorentzVector hpsgen::GenKinematics::gen_random_scalar_decay_pos(const TLorentz
   return kaonpos+traj4;
 }
 
+TLorentzVector hpsgen::GenKinematics::gen_random_scalar_decay_pos_uniform(const TLorentzVector& scalar4mom, const TLorentzVector& kaonpos,
+    rng& rand, const double* lambdas, double& weight) const {
+  const double speed = scalar4mom.Beta() * consts.speed_light();
+  const double a = std::min(lambdas[0],lambdas[1]);
+  const double b = std::max(lambdas[0],lambdas[1]);
+  weight = b-a;
+  const double p0 = CLHEP::RandFlat::shoot(&rand);
+  const double length = a + weight*p0;
+  const TVector3 traj = length * scalar4mom.Vect().Unit();
+  const double time_lab = traj.Mag() / speed;
+  const TLorentzVector traj4(traj,time_lab);
+  return kaonpos+traj4;
+}
+
 void hpsgen::GenKinematics::update_geometry(art::ServiceHandle<geo::Geometry const>& g) {
   if(geo) {
     delete geo;
@@ -158,7 +201,7 @@ bool hpsgen::GenKinematics::intersects_ray(const TVector3& orig, const TVector3&
   unsigned int ilam = 0;
   for(int coord = 0; coord < 3; ++coord) {
     if(std::abs(unit_dir[coord])>0.) {
-      for(int side = -1; side < 2; side += 2) {
+      for(int side = -1; side < 2; side += 2) { // side = -1 or +1
         const double plane = det_centre[coord] + side * det_half_dims[coord];
         const double lambda = (plane - orig[coord])/unit_dir[coord];
         if(lambda < 0) continue; // no backwards-going scalars

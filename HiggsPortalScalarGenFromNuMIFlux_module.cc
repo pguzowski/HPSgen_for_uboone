@@ -127,8 +127,8 @@ private:
 
   TTree *fSubRunTree;
   double fSubRunTree_totpot;
-  ULong64_t fSubRunTree_n_kaons_read;
-  ULong64_t fSubRunTree_n_scalars_gen;
+  ULong64_t   fSubRunTree_n_kaons_read;
+  ULong64_t   fSubRunTree_n_scalars_gen;
   int    fSubRunTree_n_scalar_decays_in_detector;
 
 };
@@ -287,7 +287,10 @@ void hpsgen::HiggsPortalScalarGenFromNuMIFlux::produce(art::Event& e)
     }
     std::multimap<int,TLorentzVector> res;
     fSubRunTree_n_scalars_gen++;
-    if(fKinHelper->generate(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, flux_weight, fMaxWeight, fRNG, res)) {
+    const bool passes = (fScalarParams == "random") ?
+      fKinHelper->generate_uniform(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, fRNG, res) :
+      fKinHelper->generate(kaon_pos, kaon_4mom, scalar_mass, model_theta, pion_type, flux_weight, fMaxWeight, fRNG, res);
+    if(passes) {
       
       const TLorentzVector& dk_pos = res.find(0)->second;
       const TLorentzVector& scalar_mom = res.find(54)->second;
